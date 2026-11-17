@@ -170,27 +170,41 @@ $("#reg-form").onsubmit = async (event) => {
 };
 
 // LOGIN
+
 $("#login-form").onsubmit = async (event) => {
   event.preventDefault();
 
   const formData = new FormData(event.target);
 
   try {
-    await signInWithEmailAndPassword(
+    const credential = await signInWithEmailAndPassword(
       auth,
       formData.get("email"),
       formData.get("password")
     );
 
-    toast("Login successful!");
+    await loadProfile(credential.user);
+
+    if (!profile) {
+      toast("Account profile not found. Please check Firebase.", true);
+      return;
+    }
 
     event.target.reset();
+
+    toast("Login successful!");
+
     show("home");
 
+    updateUI();
+    listenToDonations();
+
   } catch (error) {
+    console.error("Login error:", error);
     authError(error);
   }
 };
+
 
 // LOGOUT
 $("#nav-logout").onclick = async (event) => {
