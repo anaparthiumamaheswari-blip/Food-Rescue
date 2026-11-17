@@ -6,7 +6,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 import {
   collection,
@@ -19,15 +19,16 @@ import {
   query,
   where,
   serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// ---------- VARIABLES ----------
+// ---------------- VARIABLES ----------------
+
 const $ = (selector) => document.querySelector(selector);
 
 let user = null;
 let profile = null;
 let donations = [];
-let unsubscribeDonations = null;
+let unsub = null;
 
 const ROLE_NAMES = {
   restaurant: "Restaurant / Hotel",
@@ -35,29 +36,31 @@ const ROLE_NAMES = {
   volunteer: "Volunteer"
 };
 
-// ---------- HELPER FUNCTIONS ----------
-const esc = (value) =>
-  String(value ?? "").replace(/[&<>"']/g, (char) => ({
+// ---------------- HELPER FUNCTIONS ----------------
+
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
     '"': "&quot;",
     "'": "&#39;"
   }[char]));
+}
 
 function toast(message, isError = false) {
-  const element = $("#toast");
-  if (!element) {
-    console.log(message);
+  const box = $("#toast");
+  if (!box) {
+    alert(message);
     return;
   }
 
-  element.textContent = message;
-  element.className = "show" + (isError ? " err" : "");
+  box.textContent = message;
+  box.className = isError ? "show err" : "show";
 
   setTimeout(() => {
-    element.className = "";
-  }, 3200);
+    box.className = "";
+  }, 3500);
 }
 
 function show(page) {
@@ -67,16 +70,18 @@ function show(page) {
   }
 
   if (page === "donate" && profile?.role !== "restaurant") {
-    toast("Only restaurant or hotel accounts can donate.", true);
+    toast("Only restaurant accounts can donate food.", true);
     page = user ? "home" : "auth";
   }
 
-  document.querySelectorAll(".page").forEach((element) => {
-    element.hidden = element.id !== page;
+  document.querySelectorAll(".page").forEach((section) => {
+    section.hidden = section.id !== page;
   });
 
   window.scrollTo(0, 0);
 }
+
+// ---------------- NAVIGATION ----------------
 
 document.addEventListener("click", (event) => {
   const link = event.target.closest("[data-page]");
@@ -87,21 +92,8 @@ document.addEventListener("click", (event) => {
   }
 });
 
-function countdown(expiry) {
-  if (!expiry) return "Expiry not specified";
+// ---------------- LOGIN / REGISTER TABS ----------------
 
-  const milliseconds = new Date(expiry).getTime() - Date.now();
-
-  if (Number.isNaN(milliseconds)) return "Expiry not specified";
-  if (milliseconds <= 0) return "Expired";
-
-  const hours = Math.floor(milliseconds / 3600000);
-  const minutes = Math.floor((milliseconds % 3600000) / 60000);
-
-  return `${hours}h ${minutes}m left`;
-}
-
-// ---------- LOGIN AND REGISTRATION ----------
 $("#tab-login").onclick = () => {
   $("#login-form").hidden = false;
   $("#reg-form").hidden = true;
@@ -116,52 +108,68 @@ $("#tab-reg").onclick = () => {
   $("#tab-login").className = "";
 };
 
+// ---------------- USER PROFILE ----------------
+
 async function loadProfile(currentUser) {
-  const profileDoc = await getDoc(
-    doc(db, "users", currentUser.uid)
-  );
+  const userRef = doc(db, "users", currentUser.uid);
+  const snapshot = await getDoc(userRef);
 
-  profile = profileDoc.exists() ? profileDoc.data() : null;
+  if (!snapshot.exists()) {
+    throw new Error("User profile not found. Please register again.");
+  }
 
+  profile = snapshot.data();
   updateUI();
 }
 
+// ---------------- AUTH ERROR ----------------
+
 function authError(error) {
   const messages = {
-    "auth/invalid-credential": "Wrong email or password.",
+    "auth/invalid-credential": "Incorrect email or password.",
     "auth/email-already-in-use": "This email is already registered.",
-    "auth/weak-password": "Password must be at least 6 characters.",
+    "auth/weak-password": "Password must contain at least 6 characters.",
     "auth/invalid-email": "Please enter a valid email address."
   };
 
   toast(messages[error.code] || error.message, true);
 }
 
-// REGISTER
+// ---------------- REGISTRATION ----------------
+
 $("#reg-form").onsubmit = async (event) => {
   event.preventDefault();
 
-  const formData = new FormData(event.target);
+  const form = new FormData(event.target);
+
+  const name = String(form.get("name") || "").trim();
+  const email = String(form.get("email") || "").trim();
+  const password = String(form.get("password") || "");
+  const role = String(form.get("role") || "");
+
+  if (!name || !email || !password || !role) {
+    toast("Please fill in all registration details.", true);
+    return;
+  }
 
   try {
     const credential = await createUserWithEmailAndPassword(
       auth,
-      formData.get("email"),
-      formData.get("password")
+      email,
+      password
     );
 
     await setDoc(doc(db, "users", credential.user.uid), {
-      name: formData.get("name"),
-      email: formData.get("email"),
-      role: formData.get("role"),
+      name: name,
+      email: email,
+      role: role,
       createdAt: serverTimestamp()
     });
 
     await loadProfile(credential.user);
 
-    toast("Account created successfully!");
-
     event.target.reset();
+    toast("Registration successful! Welcome to Food Rescue.");
     show("home");
 
   } catch (error) {
@@ -169,124 +177,125 @@ $("#reg-form").onsubmit = async (event) => {
   }
 };
 
-// LOGIN
+// ---------------- LOGIN ----------------
 
 $("#login-form").onsubmit = async (event) => {
   event.preventDefault();
 
-  const formData = new FormData(event.target);
+  const form = new FormData(event.target);
+
+  const email = String(form.get("email") || "").trim();
+  const password = String(form.get("password") || "");
 
   try {
     const credential = await signInWithEmailAndPassword(
       auth,
-      formData.get("email"),
-      formData.get("password")
+      email,
+      password
     );
 
     await loadProfile(credential.user);
 
-    if (!profile) {
-      toast("Account profile not found. Please check Firebase.", true);
-      return;
-    }
-
     event.target.reset();
-
     toast("Login successful!");
-
     show("home");
 
-    updateUI();
-    listenToDonations();
-
   } catch (error) {
-    console.error("Login error:", error);
     authError(error);
   }
 };
 
+// ---------------- LOGOUT ----------------
 
-// LOGOUT
 $("#nav-logout").onclick = async (event) => {
   event.preventDefault();
 
   try {
+    if (unsub) {
+      unsub();
+      unsub = null;
+    }
+
     await signOut(auth);
     toast("Logged out successfully!");
     show("home");
+
   } catch (error) {
     toast(error.message, true);
   }
 };
 
-// ---------- UPDATE NAVIGATION ----------
+// ---------------- UPDATE PAGE AFTER LOGIN ----------------
+
 function updateUI() {
   $("#nav-auth").hidden = !!user;
   $("#nav-logout").hidden = !user;
 
-  $("#nav-donate").hidden =
-    profile?.role !== "restaurant";
+  $("#nav-donate").hidden = profile?.role !== "restaurant";
 
-  const welcome = $("#whoami");
-
-  welcome.hidden = !profile;
+  const who = $("#whoami");
 
   if (profile) {
-    welcome.textContent =
+    who.hidden = false;
+    who.textContent =
       `Signed in as ${profile.name} (${ROLE_NAMES[profile.role] || profile.role})`;
+  } else {
+    who.hidden = true;
+    who.textContent = "";
   }
 }
 
-// ---------- LOAD DONATIONS BASED ON ROLE ----------
-function listenToDonations() {
-  if (unsubscribeDonations) {
-    unsubscribeDonations();
-    unsubscribeDonations = null;
-  }
+// ---------------- DONATION QUERY ----------------
 
-  donations = [];
-  render();
+function startDonationListener() {
+  if (unsub) {
+    unsub();
+    unsub = null;
+  }
 
   if (!user || !profile) return;
 
   let donationQuery;
 
-  if (profile.role === "ngo") {
-    // NGO can see available food.
-    donationQuery = query(
-      collection(db, "donations"),
-      where("status", "==", "available")
-    );
-
-  } else if (profile.role === "volunteer") {
-    // Volunteer can see accepted food.
-    donationQuery = query(
-      collection(db, "donations"),
-      where("status", "==", "accepted")
-    );
-
-  } else if (profile.role === "restaurant") {
-    // Restaurant can see its own donations.
+  // Restaurant sees only its own donations.
+  if (profile.role === "restaurant") {
     donationQuery = query(
       collection(db, "donations"),
       where("donorId", "==", user.uid)
     );
+  }
 
-  } else {
-    toast("Your account role is missing. Please check your user profile.", true);
+  // NGO sees available donations.
+  else if (profile.role === "ngo") {
+    donationQuery = query(
+      collection(db, "donations"),
+      where("status", "==", "available")
+    );
+  }
+
+  // Volunteer sees donations accepted by NGOs.
+  else if (profile.role === "volunteer") {
+    donationQuery = query(
+      collection(db, "donations"),
+      where("status", "==", "accepted")
+    );
+  }
+
+  else {
+    donations = [];
+    render();
     return;
   }
 
-  unsubscribeDonations = onSnapshot(
+  unsub = onSnapshot(
     donationQuery,
 
     (snapshot) => {
-      donations = snapshot.docs.map((document) => ({
-        id: document.id,
-        ...document.data()
+      donations = snapshot.docs.map((item) => ({
+        id: item.id,
+        ...item.data()
       }));
 
-      // Sort newest donations first.
       donations.sort((a, b) => {
         const timeA = a.createdAt?.toMillis?.() || 0;
         const timeB = b.createdAt?.toMillis?.() || 0;
@@ -297,312 +306,375 @@ function listenToDonations() {
     },
 
     (error) => {
-      console.error("Food loading error:", error);
+      console.error("Donation loading error:", error);
       toast("Could not load donations: " + error.message, true);
     }
   );
 }
 
-// ---------- AUTHENTICATION STATE ----------
+// ---------------- LOGIN STATE LISTENER ----------------
+
 onAuthStateChanged(auth, async (currentUser) => {
   user = currentUser;
 
-  if (unsubscribeDonations) {
-    unsubscribeDonations();
-    unsubscribeDonations = null;
+  if (unsub) {
+    unsub();
+    unsub = null;
   }
 
-  donations = [];
-
-  if (currentUser) {
+  if (user) {
     try {
-      await loadProfile(currentUser);
-      listenToDonations();
+      await loadProfile(user);
+      startDonationListener();
+      render();
     } catch (error) {
       console.error("Profile loading error:", error);
-      profile = null;
-      updateUI();
-      toast("Could not load your account profile.", true);
+      toast(error.message, true);
     }
-
   } else {
     profile = null;
+    donations = [];
     updateUI();
     render();
   }
 });
 
-// ---------- ADD DONATION ----------
+// ---------------- ADD DONATION ----------------
+
 async function addDonation(data) {
   if (!user || profile?.role !== "restaurant") {
-    throw new Error("Only restaurant accounts can donate.");
+    throw new Error("Only logged-in restaurant accounts can donate.");
   }
 
-  await addDoc(collection(db, "donations"), {
-    ...data,
+  const donation = {
+    foodName: String(data.foodName || "").trim(),
+
     quantity: Number(data.quantity),
-    status: "available",
+
+    description: String(data.description || "").trim(),
+
+    donorName: String(
+      data.donorName || profile.name || "Restaurant"
+    ).trim(),
+
+    location: String(data.location || "").trim(),
+
+    expiry: String(data.expiry || "").trim(),
+
+    contact: String(
+      data.contact || profile.email || ""
+    ).trim(),
+
     donorId: user.uid,
-    donorName: profile.name,
-    contact: profile.email,
+
+    status: "available",
+
     createdAt: serverTimestamp()
-  });
+  };
+
+  if (
+    !donation.foodName ||
+    !donation.quantity ||
+    donation.quantity <= 0 ||
+    !donation.donorName ||
+    !donation.location ||
+    !donation.expiry ||
+    !donation.contact
+  ) {
+    throw new Error("Please fill in all donation details correctly.");
+  }
+
+  if (new Date(donation.expiry).getTime() <= Date.now()) {
+    throw new Error("Please select a future food expiry time.");
+  }
+
+  await addDoc(collection(db, "donations"), donation);
 }
+
+// ---------------- DONATION FORM ----------------
 
 $("#donate-form").onsubmit = async (event) => {
   event.preventDefault();
 
-  try {
-    const formData = Object.fromEntries(
-      new FormData(event.target)
-    );
+  if (!user) {
+    toast("Please log in first.", true);
+    show("auth");
+    return;
+  }
 
+  if (profile?.role !== "restaurant") {
+    toast("Only restaurant accounts can post donations.", true);
+    return;
+  }
+
+  const formData = Object.fromEntries(
+    new FormData(event.target).entries()
+  );
+
+  try {
     await addDonation(formData);
 
-    toast("Food donation posted successfully!");
-
     event.target.reset();
+
+    toast("Donation posted successfully! Thank you for sharing.");
+
     show("food");
 
   } catch (error) {
-    console.error(error);
+    console.error("Donation posting error:", error);
     toast("Could not post donation: " + error.message, true);
   }
 };
 
-// ---------- SAMPLE DONATIONS ----------
+// ---------------- SAMPLE DONATIONS ----------------
+
 $("#sample-btn").onclick = async () => {
-  if (profile?.role !== "restaurant") {
-    toast("Only restaurant accounts can add sample donations.", true);
+  if (!user || profile?.role !== "restaurant") {
+    toast("Please log in with a restaurant account.", true);
     return;
   }
 
-  const expiryAfterHours = (hours) => {
+  const futureTime = (hours) => {
     const date = new Date(Date.now() + hours * 60 * 60 * 1000);
-    const offset = date.getTimezoneOffset() * 60000;
-    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+
+    return new Date(
+      date.getTime() - date.getTimezoneOffset() * 60000
+    ).toISOString().slice(0, 16);
   };
 
   const samples = [
     {
       foodName: "Veg Biryani",
       quantity: 40,
-      description: "Freshly cooked food packed in boxes.",
-      location: "Banjara Hills, Hyderabad",
-      expiry: expiryAfterHours(5)
+      description: "Freshly cooked and packed.",
+      donorName: profile.name,
+      location: "Main Road",
+      expiry: futureTime(5),
+      contact: profile.email
     },
     {
       foodName: "Bread and Buns",
-      quantity: 60,
+      quantity: 30,
       description: "Fresh unsold bakery items.",
-      location: "Madhapur, Hyderabad",
-      expiry: expiryAfterHours(12)
+      donorName: profile.name,
+      location: "Market Area",
+      expiry: futureTime(8),
+      contact: profile.email
     },
     {
       foodName: "Dal and Rice",
       quantity: 25,
-      description: "Freshly prepared packed food.",
-      location: "Secunderabad",
-      expiry: expiryAfterHours(3)
+      description: "Freshly prepared food.",
+      donorName: profile.name,
+      location: "City Centre",
+      expiry: futureTime(3),
+      contact: profile.email
     }
   ];
 
   try {
-    for (const sample of samples) {
-      await addDonation(sample);
+    for (const donation of samples) {
+      await addDonation(donation);
     }
 
-    toast("3 sample donations added successfully!");
+    toast("Three sample donations added successfully!");
     show("food");
 
   } catch (error) {
-    console.error(error);
-    toast(error.message, true);
+    toast("Could not add samples: " + error.message, true);
   }
 };
 
-// ---------- ACCEPT OR COLLECT FOOD ----------
-async function setStatus(id, status) {
-  try {
-    let extraData = {};
+// ---------------- ACCEPT / COLLECT DONATION ----------------
 
-    if (status === "accepted" && profile?.role === "ngo") {
-      extraData = {
+async function setStatus(id, status) {
+  if (!user || !profile) return;
+
+  try {
+    let changes = {};
+
+    if (status === "accepted" && profile.role === "ngo") {
+      changes = {
+        status: "accepted",
         acceptedBy: user.uid,
         acceptedByName: profile.name
       };
+    }
 
-    } else if (
-      status === "collected" &&
-      profile?.role === "volunteer"
-    ) {
-      extraData = {
+    else if (status === "collected" && profile.role === "volunteer") {
+      changes = {
+        status: "collected",
         collectedBy: user.uid
       };
+    }
 
-    } else {
+    else {
       throw new Error("You are not allowed to perform this action.");
     }
 
-    await updateDoc(doc(db, "donations", id), {
-      status,
-      ...extraData
-    });
+    await updateDoc(doc(db, "donations", id), changes);
 
     toast(
       status === "accepted"
-        ? "Food donation accepted successfully!"
+        ? "Donation accepted successfully!"
         : "Food marked as collected!"
     );
 
   } catch (error) {
-    console.error(error);
+    console.error("Donation status error:", error);
     toast("Action failed: " + error.message, true);
   }
 }
 
+// ---------------- FOOD LIST BUTTONS ----------------
+
 $("#food-list").onclick = (event) => {
   const button = event.target.closest("button[data-id]");
 
-  if (button) {
-    setStatus(button.dataset.id, button.dataset.status);
-  }
+  if (!button) return;
+
+  setStatus(button.dataset.id, button.dataset.status);
 };
+
+// ---------------- FILTER ----------------
 
 $("#filter").onchange = render;
 
-// ---------- DISPLAY FOOD ----------
-function render() {
-  const foodList = $("#food-list");
-  const filter = $("#filter");
+// ---------------- COUNTDOWN ----------------
 
-  if (!foodList || !filter) return;
+function countdown(expiry) {
+  const remaining = new Date(expiry).getTime() - Date.now();
 
-  const selectedFilter = filter.value;
-
-  const filteredDonations = donations.filter((donation) => {
-    return selectedFilter === "all" ||
-      donation.status === selectedFilter;
-  });
-
-  if (filteredDonations.length === 0) {
-    foodList.innerHTML = `
-      <div class="empty">
-        <h3>No food available right now</h3>
-        <p>New food donations will appear here.</p>
-      </div>
-    `;
-  } else {
-    foodList.innerHTML = filteredDonations.map((donation) => {
-      let button = "";
-
-      if (
-        donation.status === "available" &&
-        profile?.role === "ngo"
-      ) {
-        button = `
-          <button class="btn small"
-            data-id="${esc(donation.id)}"
-            data-status="accepted">
-            Accept Food
-          </button>
-        `;
-      }
-
-      if (
-        donation.status === "accepted" &&
-        profile?.role === "volunteer"
-      ) {
-        button = `
-          <button class="btn small"
-            data-id="${esc(donation.id)}"
-            data-status="collected">
-            Mark Collected
-          </button>
-        `;
-      }
-
-      return `
-        <article class="card">
-
-          <span class="badge ${esc(donation.status)}">
-            ${esc(donation.status)}
-          </span>
-
-          <h3>${esc(donation.foodName)}</h3>
-
-          <p>${esc(donation.description)}</p>
-
-          <p class="meta">
-            <b>${esc(donation.quantity)}</b> servings
-            · from ${esc(donation.donorName)}
-          </p>
-
-          <p class="meta">
-            📍 ${esc(donation.location)}
-          </p>
-
-          <p class="meta">
-            📞 ${esc(donation.contact)}
-          </p>
-
-          ${donation.acceptedByName
-            ? `<p class="meta">Accepted by ${esc(donation.acceptedByName)}</p>`
-            : ""
-          }
-
-          ${donation.status !== "collected"
-            ? `<p class="count" data-exp="${esc(donation.expiry)}">${countdown(donation.expiry)}</p>`
-            : ""
-          }
-
-          ${button}
-
-        </article>
-      `;
-    }).join("");
+  if (!Number.isFinite(remaining) || remaining <= 0) {
+    return "Expired";
   }
 
-  // Dashboard statistics
-  const countStatus = (status) =>
-    donations.filter((donation) => donation.status === status).length;
+  const hours = Math.floor(remaining / 3600000);
+  const minutes = Math.floor((remaining % 3600000) / 60000);
 
-  const rescuedMeals = donations
-    .filter((donation) => donation.status === "collected")
-    .reduce((total, donation) => total + (Number(donation.quantity) || 0), 0);
-
-  const stat = (value, label) => `
-    <div class="card">
-      <b>${value}</b>
-      ${label}
-    </div>
-  `;
-
-  const stats = $("#stats");
-
-  if (stats) {
-    stats.innerHTML =
-      stat(donations.length, "Total donations") +
-      stat(countStatus("available"), "Available") +
-      stat(countStatus("accepted"), "Accepted") +
-      stat(countStatus("collected"), "Collected") +
-      stat(rescuedMeals, "Meals rescued");
-  }
+  return `${hours} hours ${minutes} minutes left`;
 }
 
-// ---------- UPDATE EXPIRY COUNTDOWN ----------
-setInterval(() => {
-  document.querySelectorAll("[data-exp]").forEach((element) => {
-    element.textContent = countdown(element.dataset.exp);
+// ---------------- DISPLAY FOOD ----------------
 
-    const remaining =
-      new Date(element.dataset.exp).getTime() - Date.now();
+function render() {
+  const foodList = $("#food-list");
+  const filter = $("#filter").value;
 
-    element.classList.toggle(
-      "low",
-      remaining > 0 && remaining < 3600000
+  let visibleDonations = donations;
+
+  if (filter !== "all") {
+    visibleDonations = visibleDonations.filter(
+      (donation) => donation.status === filter
     );
-  });
-}, 1000);
+  }
 
+  foodList.innerHTML = visibleDonations.length
+    ? visibleDonations.map((donation) => {
+        let button = "";
+
+        if (
+          profile?.role === "ngo" &&
+          donation.status === "available"
+        ) {
+          button = `
+            <button class="btn small"
+              data-id="${esc(donation.id)}"
+              data-status="accepted">
+              Accept Food
+            </button>`;
+        }
+
+        if (
+          profile?.role === "volunteer" &&
+          donation.status === "accepted"
+        ) {
+          button = `
+            <button class="btn small"
+              data-id="${esc(donation.id)}"
+              data-status="collected">
+              Mark Collected
+            </button>`;
+        }
+
+        return `
+          <article class="card">
+            <span class="badge ${esc(donation.status)}">
+              ${esc(donation.status)}
+            </span>
+
+            <h3>${esc(donation.foodName)}</h3>
+
+            <p>${esc(donation.description)}</p>
+
+            <p class="meta">
+              <b>Quantity:</b> ${esc(donation.quantity)} servings
+            </p>
+
+            <p class="meta">
+              <b>Restaurant:</b> ${esc(donation.donorName)}
+            </p>
+
+            <p class="meta">
+              <b>Location:</b> ${esc(donation.location)}
+            </p>
+
+            <p class="meta">
+              <b>Contact:</b> ${esc(donation.contact)}
+            </p>
+
+            <p class="count">
+              ${countdown(donation.expiry)}
+            </p>
+
+            ${button}
+          </article>
+        `;
+      }).join("")
+    : `
+      <div class="empty">
+        <h3>No food donations found.</h3>
+        <p>New donations will appear here.</p>
+      </div>
+    `;
+
+  // Dashboard statistics
+  const count = (status) =>
+    donations.filter((d) => d.status === status).length;
+
+  const rescued = donations
+    .filter((d) => d.status === "collected")
+    .reduce((total, d) => total + (Number(d.quantity) || 0), 0);
+
+  $("#stats").innerHTML = `
+    <div class="card">
+      <h3>${donations.length}</h3>
+      <p>Total donations</p>
+    </div>
+
+    <div class="card">
+      <h3>${count("available")}</h3>
+      <p>Available</p>
+    </div>
+
+    <div class="card">
+      <h3>${count("accepted")}</h3>
+      <p>Accepted</p>
+    </div>
+
+    <div class="card">
+      <h3>${count("collected")}</h3>
+      <p>Collected</p>
+    </div>
+
+    <div class="card">
+      <h3>${rescued}</h3>
+      <p>Meals rescued</p>
+    </div>
+  `;
+}
+
+// Initial page setup
+updateUI();
 render();
+show("home");
