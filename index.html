@@ -1,103 +1,290 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Food Rescue – Save Food, Feed People</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Food Rescue | Save Food, Feed People</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
 <header class="nav">
-  <a class="logo" href="#" data-page="home">🌿 Food Rescue</a>
-  <nav id="links">
+  <a class="logo" href="#" data-page="home">🍊 Food Rescue</a>
+  <nav>
     <a href="#" data-page="home">Home</a>
     <a href="#" data-page="about">About</a>
     <a href="#" data-page="donate" id="nav-donate" hidden>Donate Food</a>
     <a href="#" data-page="food">Available Food</a>
     <a href="#" data-page="dashboard">Dashboard</a>
     <a href="#" data-page="auth" id="nav-auth" class="btn small">Login</a>
-    <a href="#" id="nav-logout" class="btn small ghost" hidden>Logout</a>
+    <a href="#" id="nav-logout" class="btn small logout" hidden>Logout</a>
   </nav>
 </header>
+
 <div id="whoami" class="who" hidden></div>
 
 <main>
+
+<!-- HOME PAGE -->
 <section class="page" id="home">
+
   <div class="hero">
-    <div>
-      <h1>Save Food, Feed People ❤️</h1>
-      <p class="tag">Share extra food. Spread hope.</p>
-      <p>Every day hotels and restaurants throw away good food while people go hungry. Food Rescue connects them with NGOs and volunteers who collect it and deliver it to people in need.</p>
+    <div class="hero-content">
+      <span class="eyebrow">💚 Every meal matters</span>
+      <h1>Save Food.<br>Share Love.<br><span>Spread Happiness!</span></h1>
+      <p class="tag">Good food deserves a second chance.</p>
+      <p>Connect restaurants with NGOs and help surplus food reach people who need it. Together, we can reduce food waste and fight hunger.</p>
+
       <div class="row">
-        <a href="#" class="btn" data-page="donate">Donate Food</a>
-        <a href="#" class="btn ghost" data-page="food">Find Food</a>
+        <a href="#" class="btn" data-page="donate">Donate Food ❤️</a>
+        <a href="#" class="btn secondary" data-page="food">Find Food 🍲</a>
+      </div>
+
+      <div class="hero-points">
+        <span>🌱 Reduce waste</span>
+        <span>🤝 Help people</span>
+        <span>❤️ Spread hope</span>
       </div>
     </div>
-    <div class="plate" aria-hidden="true">🍲<span>🥖</span><span>🍛</span><span>🥗</span></div>
-  </div>
-  <p class="banner">About one-third of all food produced worldwide is wasted. Your surplus can be someone's meal tonight.</p>
-</section>
 
-<section class="page" id="about" hidden>
-  <h2>About Food Rescue</h2>
+    <div class="hero-image">
+      <img
+        src="https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=1000&q=85"
+        alt="Fresh and healthy food served in a bowl">
+      <div class="floating-note">🥗 Share a meal, share happiness!</div>
+    </div>
+  </div>
+
+  <section class="impact-banner">
+    <h2>Small actions. Big changes.</h2>
+    <p>Don't waste good food. Turn surplus meals into smiles.</p>
+  </section>
+
+  <h2 class="section-title">How Food Rescue Works</h2>
+
   <div class="grid">
-    <article class="card"><h3>The problem</h3><p>Restaurants and hotels often cook more than they sell. Safe, edible food ends up in the bin while millions go to bed hungry.</p></article>
-    <article class="card"><h3>How it works</h3><p>A restaurant posts surplus food. An NGO accepts it. A volunteer picks it up and marks it collected. Status updates live for everyone.</p></article>
-    <article class="card"><h3>Why it matters</h3><p>Saving surplus food feeds people, cuts waste and reduces the greenhouse gases that rotting food produces.</p></article>
+    <article class="card feature-card">
+      <div class="feature-icon">🍱</div>
+      <h3>1. Donate Food</h3>
+      <p>Restaurants and hotels share their surplus food details.</p>
+    </article>
+
+    <article class="card feature-card">
+      <div class="feature-icon">🤝</div>
+      <h3>2. NGO Accepts</h3>
+      <p>NGOs find available donations and accept the food.</p>
+    </article>
+
+    <article class="card feature-card">
+      <div class="feature-icon">🚚</div>
+      <h3>3. Food Rescued</h3>
+      <p>Food reaches people in need instead of going to waste.</p>
+    </article>
   </div>
+
+  <div class="photo-strip">
+    <img src="https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=600&q=80" alt="Fresh food">
+    <img src="https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=600&q=80" alt="Healthy meal">
+    <img src="https://images.unsplash.com/photo-1543353071-873f17a7a088?auto=format&fit=crop&w=600&q=80" alt="Food sharing">
+  </div>
+
+  <div class="closing-banner">
+    <h2>Be the reason someone smiles today! 💛</h2>
+    <p>Save food and make a difference.</p>
+  </div>
+
 </section>
 
+<!-- ABOUT PAGE -->
+<section class="page" id="about" hidden>
+
+  <div class="page-heading">
+    <span class="eyebrow">Our mission 💚</span>
+    <h1>About Food Rescue</h1>
+    <p>Making food sharing easier and reducing food wastage.</p>
+  </div>
+
+  <div class="about-layout">
+    <img src="https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&w=900&q=85" alt="Volunteers sharing food">
+    <div>
+      <h2>Why Food Rescue?</h2>
+      <p>Every day, restaurants and hotels have surplus food. At the same time, many people need nutritious meals.</p>
+      <p>Food Rescue provides a simple platform to connect food donors with NGOs and volunteers.</p>
+      <p>Our goal is to make surplus food useful and create a better community.</p>
+    </div>
+  </div>
+
+  <h2 class="section-title">Our Main Objectives</h2>
+
+  <div class="grid">
+    <article class="card feature-card">
+      <div class="feature-icon">🌍</div>
+      <h3>Reduce Food Waste</h3>
+      <p>Prevent good food from being thrown away.</p>
+    </article>
+    <article class="card feature-card">
+      <div class="feature-icon">❤️</div>
+      <h3>Help People</h3>
+      <p>Connect surplus food with people who need meals.</p>
+    </article>
+    <article class="card feature-card">
+      <div class="feature-icon">🌱</div>
+      <h3>Protect Nature</h3>
+      <p>Encourage responsible food consumption.</p>
+    </article>
+  </div>
+
+</section>
+
+<!-- DONATE PAGE -->
 <section class="page" id="donate" hidden>
-  <h2>Donate surplus food</h2>
-  <form id="donate-form" class="card form">
-    <label>Food name<input name="foodName" required></label>
-    <label>Quantity (servings)<input name="quantity" type="number" min="1" required></label>
-    <label>Description<textarea name="description" rows="2" required></textarea></label>
-    <label>Restaurant / hotel name<input name="donorName" required></label>
-    <label>Pickup location<input name="location" required></label>
-    <label>Food expiry time<input name="expiry" type="datetime-local" required></label>
-    <label>Contact (phone or email)<input name="contact" required></label>
-    <button class="btn">Post donation</button>
-    <button type="button" class="btn ghost" id="sample-btn">Add 3 sample donations</button>
-  </form>
-</section>
 
-<section class="page" id="food" hidden>
-  <h2>Available food</h2>
-  <select id="filter"><option value="all">All donations</option><option value="available">Available</option><option value="accepted">Accepted</option><option value="collected">Collected</option></select>
-  <div id="food-list" class="grid"></div>
-</section>
+  <div class="page-heading">
+    <span class="eyebrow">Share a meal ❤️</span>
+    <h1>Donate Surplus Food</h1>
+    <p>Your extra food can make someone's day better.</p>
+  </div>
 
-<section class="page" id="auth" hidden>
-  <div class="card form narrow">
-    <div class="tabs"><button id="tab-login" class="on">Login</button><button id="tab-reg">Register</button></div>
-    <form id="login-form">
-      <label>Email<input name="email" type="email" required></label>
-      <label>Password<input name="password" type="password" required></label>
-      <button class="btn">Log in</button>
-    </form>
-    <form id="reg-form" hidden>
-      <label>Name / organisation<input name="name" required></label>
-      <label>Email<input name="email" type="email" required></label>
-      <label>Password (min 6 characters)<input name="password" type="password" minlength="6" required></label>
-      <label>I am a
-        <select name="role"><option value="restaurant">Restaurant / Hotel</option><option value="ngo">NGO / Organization</option><option value="volunteer">Volunteer</option></select>
+  <div class="donate-layout">
+
+    <div class="donate-image">
+      <img src="https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=85" alt="Fresh prepared food">
+      <h2>Good food should never go to waste!</h2>
+      <p>Share your surplus food with people who need it.</p>
+    </div>
+
+    <form id="donate-form" class="card form">
+      <label>Food name
+        <input name="foodName" placeholder="Example: Veg Biryani" required>
       </label>
-      <button class="btn">Create account</button>
+
+      <label>Quantity (servings)
+        <input name="quantity" type="number" min="1" placeholder="Enter quantity" required>
+      </label>
+
+      <label>Description
+        <textarea name="description" rows="2" placeholder="Describe the food" required></textarea>
+      </label>
+
+      <label>Restaurant / hotel name
+        <input name="donorName" placeholder="Restaurant name" required>
+      </label>
+
+      <label>Pickup location
+        <input name="location" placeholder="Enter address" required>
+      </label>
+
+      <label>Food expiry time
+        <input name="expiry" type="datetime-local" required>
+      </label>
+
+      <label>Contact (phone or email)
+        <input name="contact" placeholder="Contact details" required>
+      </label>
+
+      <button type="submit" class="btn">Post Donation ❤️</button>
+      <button type="button" class="btn secondary" id="sample-btn">Add 3 Sample Donations</button>
     </form>
+
   </div>
 </section>
 
+<!-- AVAILABLE FOOD PAGE -->
+<section class="page" id="food" hidden>
+
+  <div class="page-heading">
+    <span class="eyebrow">Food sharing 🍲</span>
+    <h1>Available Food</h1>
+    <p>Discover surplus food shared by restaurants.</p>
+  </div>
+
+  <select id="filter">
+    <option value="all">All donations</option>
+    <option value="available">Available</option>
+    <option value="accepted">Accepted</option>
+    <option value="collected">Collected</option>
+  </select>
+
+  <div id="food-list" class="grid food-grid"></div>
+</section>
+
+<!-- LOGIN AND REGISTER -->
+<section class="page" id="auth" hidden>
+
+  <div class="auth-layout">
+
+    <div class="auth-image">
+      <img src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=900&q=85" alt="Community food support">
+      <h2>Together we can fight hunger.</h2>
+      <p>Join our food-saving community.</p>
+    </div>
+
+    <div class="card form auth-card">
+      <h2>Welcome to Food Rescue 👋</h2>
+
+      <div class="tabs">
+        <button type="button" id="tab-login" class="on">Login</button>
+        <button type="button" id="tab-reg">Register</button>
+      </div>
+
+      <form id="login-form">
+        <label>Email
+          <input name="email" type="email" required>
+        </label>
+        <label>Password
+          <input name="password" type="password" required>
+        </label>
+        <button class="btn">Login</button>
+      </form>
+
+      <form id="reg-form" hidden>
+        <label>Name / Organisation
+          <input name="name" required>
+        </label>
+        <label>Email
+          <input name="email" type="email" required>
+        </label>
+        <label>Password (minimum 6 characters)
+          <input name="password" type="password" minlength="6" required>
+        </label>
+        <label>I am a
+          <select name="role">
+            <option value="restaurant">Restaurant / Hotel</option>
+            <option value="ngo">NGO / Organisation</option>
+            <option value="volunteer">Volunteer</option>
+          </select>
+        </label>
+        <button class="btn">Create Account</button>
+      </form>
+
+    </div>
+  </div>
+</section>
+
+<!-- DASHBOARD -->
 <section class="page" id="dashboard" hidden>
-  <h2>Dashboard</h2>
+  <div class="page-heading">
+    <span class="eyebrow">Live information 📊</span>
+    <h1>Food Rescue Dashboard</h1>
+    <p>Track donations and meals rescued.</p>
+  </div>
   <div class="grid stats" id="stats"></div>
 </section>
+
 </main>
 
 <div id="toast" role="status"></div>
-<footer>Food Rescue · B.Tech CSE mini-project</footer>
+
+<footer>
+  <h3>🍊 Food Rescue</h3>
+  <p>Save Food · Share Love · Spread Happiness</p>
+  <p>B.Tech CSE Mini Project</p>
+</footer>
+
 <script type="module" src="app.js"></script>
 </body>
 </html>
