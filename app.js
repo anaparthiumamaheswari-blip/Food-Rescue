@@ -21,12 +21,14 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
+// ---------------- BASIC SETTINGS ----------------
+
 const $ = (selector) => document.querySelector(selector);
 
 let user = null;
 let profile = null;
 let donations = [];
-let unsub = null;
+let unsubscribeDonations = null;
 
 const ROLE_NAMES = {
   restaurant: "Restaurant / Hotel",
@@ -34,60 +36,38 @@ const ROLE_NAMES = {
   volunteer: "Volunteer"
 };
 
-// FOOD PHOTOS
-function foodPhoto(foodName) {
-  const name = String(foodName || "").toLowerCase();
+// ---------------- HELPER FUNCTIONS ----------------
 
-  if (name.includes("biryani") || name.includes("rice")) {
-    return "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=700&q=80";
-  }
-
-  if (name.includes("bread") || name.includes("bun")) {
-    return "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=700&q=80";
-  }
-
-  if (name.includes("pizza")) {
-    return "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=700&q=80";
-  }
-
-  if (name.includes("fruit") || name.includes("apple")) {
-    return "https://images.unsplash.com/photo-1490474418585-ba9bad8fd0ea?auto=format&fit=crop&w=700&q=80";
-  }
-
-  if (name.includes("burger")) {
-    return "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=700&q=80";
-  }
-
-  if (name.includes("cake") || name.includes("sweet")) {
-    return "https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=700&q=80";
-  }
-
-  return "https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=700&q=80";
-}
-
-// SAFE HTML
-const esc = (value) =>
-  String(value ?? "").replace(/[&<>"']/g, (char) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
-  }[char]));
-
-// MESSAGE
 function toast(message, isError = false) {
   const element = $("#toast");
 
+  if (!element) {
+    alert(message);
+    return;
+  }
+
   element.textContent = message;
-  element.className = "show" + (isError ? " err" : "");
+  element.className = isError ? "show err" : "show";
 
   setTimeout(() => {
     element.className = "";
-  }, 3200);
+  }, 3500);
 }
 
-// PAGE NAVIGATION
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => {
+    const characters = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    };
+
+    return characters[character];
+  });
+}
+
 function show(page) {
   if (["food", "dashboard"].includes(page) && !user) {
     toast("Please log in first.", true);
@@ -103,8 +83,10 @@ function show(page) {
     element.hidden = element.id !== page;
   });
 
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  window.scrollTo(0, 0);
 }
+
+// Navigation
 
 document.addEventListener("click", (event) => {
   const link = event.target.closest("[data-page]");
@@ -115,171 +97,584 @@ document.addEventListener("click", (event) => {
   }
 });
 
-// EXPIRY COUNTDOWN
-function countdown(expiry) {
-  const milliseconds = new Date(expiry) - Date.now();
+// ---------------- FOOD PHOTOGRAPHS ----------------
 
-  if (!Number.isFinite(milliseconds) || milliseconds <= 0) {
-    return "Expired";
+function foodPhoto(foodName) {
+  const name = String(foodName || "").toLowerCase();
+
+  if (name.includes("biryani")) {
+    return "https://images.unsplash.com/photo-1563379091339-03246963d96a?w=700";
   }
 
-  const hours = Math.floor(milliseconds / 3600000);
-  const minutes = Math.floor((milliseconds % 3600000) / 60000);
-  const seconds = Math.floor((milliseconds % 60000) / 1000);
+  if (name.includes("rice") || name.includes("dal")) {
+    return "https://images.unsplash.com/photo-1512058564366-18510be2db19?w=700";
+  }
 
-  return `${hours}h ${minutes}m ${seconds}s left`;
+  if (name.includes("bread") || name.includes("bun")) {
+    return "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=700";
+  }
+
+  if (name.includes("fruit")) {
+    return "https://images.unsplash.com/photo-1490474418585-ba9bad8fd0ea?w=700";
+  }
+
+  if (name.includes("pizza")) {
+    return "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=700";
+  }
+
+  if (name.includes("vegetable")) {
+    return "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=700";
+  }
+
+  return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=700";
 }
 
-// LOGIN AND REGISTER TABS
-$("#tab-login").onclick = () => {
-  $("#login-form").hidden = false;
-  $("#reg-form").hidden = true;
+// ---------------- EXPIRY COUNTDOWN ----------------
 
-  $("#tab-login").className = "on";
-  $("#tab-reg").className = "";
-};
+function countdown(expiry) {
+  if (!expiry) return "Expiry not specified";
 
-$("#tab-reg").onclick = () => {
-  $("#login-form").hidden = true;
-  $("#reg-form").hidden = false;
+  const remaining = new Date(expiry).getTime() - Date.now();
 
-  $("#tab-reg").className = "on";
-  $("#tab-login").className = "";
-};
+  if (Number.isNaN(remaining)) return "Expiry not specified";
+  if (remaining <= 0) return "Expired";
 
-// LOAD USER PROFILE
+  const hours = Math.floor(remaining / 3600000);
+  const minutes = Math.floor((remaining % 3600000) / 60000);
+
+  return `${hours}h ${minutes}m left`;
+}
+
+// ---------------- AUTHENTICATION ----------------
+
+// Login and registration tabs
+
+if ($("#tab-login")) {
+  $("#tab-login").onclick = () => {
+    $("#login-form").hidden = false;
+    $("#reg-form").hidden = true;
+
+    $("#tab-login").classList.add("on");
+    $("#tab-reg").classList.remove("on");
+  };
+}
+
+if ($("#tab-reg")) {
+  $("#tab-reg").onclick = () => {
+    $("#login-form").hidden = true;
+    $("#reg-form").hidden = false;
+
+    $("#tab-reg").classList.add("on");
+    $("#tab-login").classList.remove("on");
+  };
+}
+
+// Load user profile from Firestore
+
 async function loadProfile(currentUser) {
-  const snapshot = await getDoc(
-    doc(db, "users", currentUser.uid)
-  );
+  const userRef = doc(db, "users", currentUser.uid);
+  const userSnapshot = await getDoc(userRef);
 
-  profile = snapshot.exists() ? snapshot.data() : null;
+  if (userSnapshot.exists()) {
+    profile = userSnapshot.data();
+  } else {
+    profile = null;
+  }
 
   updateUI();
 }
 
-// AUTHENTICATION ERRORS
+// Display authentication errors
+
 function authError(error) {
   const messages = {
     "auth/invalid-credential": "Incorrect email or password.",
     "auth/email-already-in-use": "This email is already registered.",
     "auth/weak-password": "Password must contain at least 6 characters.",
-    "auth/invalid-email": "Please enter a valid email address."
+    "auth/invalid-email": "Please enter a valid email address.",
+    "auth/network-request-failed": "Check your internet connection."
   };
 
   toast(messages[error.code] || error.message, true);
 }
 
-// REGISTRATION
-$("#reg-form").onsubmit = async (event) => {
-  event.preventDefault();
+// Registration
 
-  const form = new FormData(event.target);
+if ($("#reg-form")) {
+  $("#reg-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
 
-  try {
-    const credential = await createUserWithEmailAndPassword(
-      auth,
-      form.get("email").trim(),
-      form.get("password")
-    );
+    const form = event.currentTarget;
+    const data = new FormData(form);
 
-    await setDoc(
-      doc(db, "users", credential.user.uid),
-      {
-        name: form.get("name").trim(),
-        email: form.get("email").trim(),
-        role: form.get("role"),
+    const name = String(data.get("name") || "").trim();
+    const email = String(data.get("email") || "").trim();
+    const password = String(data.get("password") || "");
+    const role = String(data.get("role") || "");
+
+    if (!name || !email || !password || !role) {
+      toast("Please fill in all registration details.", true);
+      return;
+    }
+
+    try {
+      const credential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      await setDoc(doc(db, "users", credential.user.uid), {
+        name: name,
+        email: email,
+        role: role,
         createdAt: serverTimestamp()
-      }
-    );
+      });
 
-    await loadProfile(credential.user);
+      await loadProfile(credential.user);
 
-    toast("Account created successfully!");
+      form.reset();
 
-    event.target.reset();
-    show("home");
+      toast("Account created successfully!");
+      show("home");
 
-  } catch (error) {
-    authError(error);
-  }
-};
+    } catch (error) {
+      authError(error);
+    }
+  });
+}
 
-// LOGIN
-$("#login-form").onsubmit = async (event) => {
-  event.preventDefault();
+// Login
 
-  const form = new FormData(event.target);
+if ($("#login-form")) {
+  $("#login-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
 
-  try {
-    await signInWithEmailAndPassword(
-      auth,
-      form.get("email").trim(),
-      form.get("password")
-    );
+    const form = event.currentTarget;
+    const data = new FormData(form);
 
-    toast("Logged in successfully!");
+    const email = String(data.get("email") || "").trim();
+    const password = String(data.get("password") || "");
 
-    event.target.reset();
-    show("home");
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
 
-  } catch (error) {
-    authError(error);
-  }
-};
+      form.reset();
 
-// LOGOUT
-$("#nav-logout").onclick = async (event) => {
-  event.preventDefault();
+      toast("Login successful!");
+      show("home");
 
-  try {
-    await signOut(auth);
+    } catch (error) {
+      authError(error);
+    }
+  });
+}
 
-    toast("Logged out successfully!");
-    show("home");
+// Logout
 
-  } catch (error) {
-    toast(error.message, true);
-  }
-};
+if ($("#nav-logout")) {
+  $("#nav-logout").addEventListener("click", async (event) => {
+    event.preventDefault();
 
-// UPDATE NAVIGATION
+    try {
+      await signOut(auth);
+      toast("Logged out successfully!");
+      show("home");
+    } catch (error) {
+      toast(error.message, true);
+    }
+  });
+}
+
+// Update navigation based on login status
+
 function updateUI() {
-  $("#nav-auth").hidden = !!user;
-  $("#nav-logout").hidden = !user;
+  const authButton = $("#nav-auth");
+  const logoutButton = $("#nav-logout");
+  const donateButton = $("#nav-donate");
+  const welcome = $("#whoami");
 
-  $("#nav-donate").hidden =
-    profile?.role !== "restaurant";
+  if (authButton) authButton.hidden = !!user;
 
-  const who = $("#whoami");
+  if (logoutButton) logoutButton.hidden = !user;
 
-  who.hidden = !profile;
+  if (donateButton) {
+    donateButton.hidden = profile?.role !== "restaurant";
+  }
 
-  if (profile) {
-    who.textContent =
-      `Signed in as ${profile.name} (${ROLE_NAMES[profile.role] || profile.role})`;
+  if (welcome) {
+    welcome.hidden = !profile;
+
+    if (profile) {
+      welcome.textContent =
+        `Signed in as ${profile.name || user.email} (${ROLE_NAMES[profile.role] || profile.role})`;
+    }
   }
 }
 
-// FIREBASE AUTH STATE
+// ---------------- FOOD DONATIONS ----------------
+
+async function addDonation(data) {
+  if (!user || !profile) {
+    throw new Error("Please log in before donating food.");
+  }
+
+  if (profile.role !== "restaurant") {
+    throw new Error("Only restaurant accounts can donate.");
+  }
+
+  const donation = {
+    foodName: String(data.foodName || "").trim(),
+    quantity: Number(data.quantity),
+    description: String(data.description || "").trim(),
+    donorName: String(data.donorName || profile.name || "").trim(),
+    location: String(data.location || "").trim(),
+    expiry: String(data.expiry || "").trim(),
+    contact: String(data.contact || profile.email || "").trim(),
+    status: "available",
+    donorId: user.uid,
+    createdAt: serverTimestamp()
+  };
+
+  if (
+    !donation.foodName ||
+    !donation.quantity ||
+    donation.quantity <= 0 ||
+    !donation.donorName ||
+    !donation.location ||
+    !donation.expiry ||
+    !donation.contact
+  ) {
+    throw new Error("Please complete all required donation fields.");
+  }
+
+  if (new Date(donation.expiry).getTime() <= Date.now()) {
+    throw new Error("Please enter a future expiry time.");
+  }
+
+  await addDoc(collection(db, "donations"), donation);
+}
+
+// Donation form
+
+if ($("#donate-form")) {
+  $("#donate-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const data = Object.fromEntries(new FormData(form));
+
+    try {
+      await addDonation(data);
+
+      form.reset();
+
+      toast("Food donation posted successfully!");
+      show("food");
+
+    } catch (error) {
+      toast("Could not post donation: " + error.message, true);
+    }
+  });
+}
+
+// ---------------- SAMPLE DONATIONS ----------------
+
+if ($("#sample-btn")) {
+  $("#sample-btn").onclick = async () => {
+    if (!user || profile?.role !== "restaurant") {
+      toast("Please log in as a restaurant account.", true);
+      return;
+    }
+
+    const futureTime = (hours) => {
+      const date = new Date(Date.now() + hours * 3600000);
+      const localDate = new Date(
+        date.getTime() - date.getTimezoneOffset() * 60000
+      );
+
+      return localDate.toISOString().slice(0, 16);
+    };
+
+    const samples = [
+      {
+        foodName: "Veg Biryani",
+        quantity: 40,
+        description: "Freshly prepared and packed food.",
+        donorName: profile.name || "Restaurant",
+        location: "Hyderabad",
+        expiry: futureTime(5),
+        contact: profile.email
+      },
+      {
+        foodName: "Bread & Buns",
+        quantity: 30,
+        description: "Fresh unsold bakery items.",
+        donorName: profile.name || "Restaurant",
+        location: "Hyderabad",
+        expiry: futureTime(8),
+        contact: profile.email
+      },
+      {
+        foodName: "Dal & Rice",
+        quantity: 25,
+        description: "Freshly cooked meal packets.",
+        donorName: profile.name || "Restaurant",
+        location: "Hyderabad",
+        expiry: futureTime(4),
+        contact: profile.email
+      }
+    ];
+
+    try {
+      for (const sample of samples) {
+        await addDonation(sample);
+      }
+
+      toast("Three sample donations added!");
+      show("food");
+
+    } catch (error) {
+      toast(error.message, true);
+    }
+  };
+}
+
+// ---------------- ACCEPT / COLLECT FOOD ----------------
+
+async function setDonationStatus(id, status) {
+  if (!user || !profile) {
+    toast("Please log in first.", true);
+    return;
+  }
+
+  try {
+    const extraData = {};
+
+    if (status === "accepted" && profile.role === "ngo") {
+      extraData.acceptedBy = user.uid;
+      extraData.acceptedByName = profile.name || profile.email;
+    } else if (
+      status === "collected" &&
+      profile.role === "volunteer"
+    ) {
+      extraData.collectedBy = user.uid;
+    } else {
+      toast("Your account cannot perform this action.", true);
+      return;
+    }
+
+    await updateDoc(doc(db, "donations", id), {
+      status: status,
+      ...extraData
+    });
+
+    toast(
+      status === "accepted"
+        ? "Food donation accepted successfully!"
+        : "Food marked as collected!"
+    );
+
+  } catch (error) {
+    toast("Could not update donation: " + error.message, true);
+  }
+}
+
+// Donation action buttons
+
+if ($("#food-list")) {
+  $("#food-list").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-id]");
+
+    if (button) {
+      setDonationStatus(
+        button.dataset.id,
+        button.dataset.status
+      );
+    }
+  });
+}
+
+// ---------------- DISPLAY DONATIONS ----------------
+
+function render() {
+  const foodList = $("#food-list");
+
+  if (!foodList) return;
+
+  const filterElement = $("#filter");
+  const selectedFilter = filterElement
+    ? filterElement.value
+    : "all";
+
+  const filteredDonations = donations.filter((donation) => {
+    return (
+      selectedFilter === "all" ||
+      donation.status === selectedFilter
+    );
+  });
+
+  if (filteredDonations.length === 0) {
+    foodList.innerHTML = `
+      <div class="empty">
+        <h3>No food donations found</h3>
+        <p>New food donations will appear here.</p>
+      </div>
+    `;
+  } else {
+    foodList.innerHTML = filteredDonations.map((donation) => {
+      let actionButton = "";
+
+      if (
+        donation.status === "available" &&
+        profile?.role === "ngo"
+      ) {
+        actionButton = `
+          <button class="btn small"
+            data-id="${escapeHTML(donation.id)}"
+            data-status="accepted">
+            Accept Food
+          </button>
+        `;
+      }
+
+      if (
+        donation.status === "accepted" &&
+        profile?.role === "volunteer"
+      ) {
+        actionButton = `
+          <button class="btn small"
+            data-id="${escapeHTML(donation.id)}"
+            data-status="collected">
+            Mark Collected
+          </button>
+        `;
+      }
+
+      return `
+        <article class="card food-card">
+
+          <img
+            src="${foodPhoto(donation.foodName)}"
+            alt="${escapeHTML(donation.foodName)}"
+            class="food-image"
+            loading="lazy"
+          >
+
+          <span class="badge ${escapeHTML(donation.status)}">
+            ${escapeHTML(donation.status)}
+          </span>
+
+          <h3>${escapeHTML(donation.foodName)}</h3>
+
+          <p>${escapeHTML(donation.description)}</p>
+
+          <p>
+            <strong>Quantity:</strong>
+            ${escapeHTML(donation.quantity)} servings
+          </p>
+
+          <p>
+            <strong>Restaurant:</strong>
+            ${escapeHTML(donation.donorName)}
+          </p>
+
+          <p>
+            <strong>Location:</strong>
+            ${escapeHTML(donation.location)}
+          </p>
+
+          <p>
+            <strong>Contact:</strong>
+            ${escapeHTML(donation.contact)}
+          </p>
+
+          <p>
+            <strong>Expiry:</strong>
+            ${escapeHTML(countdown(donation.expiry))}
+          </p>
+
+          ${
+            donation.acceptedByName
+              ? `<p>Accepted by: ${escapeHTML(donation.acceptedByName)}</p>`
+              : ""
+          }
+
+          ${actionButton}
+
+        </article>
+      `;
+    }).join("");
+  }
+
+  // Dashboard statistics
+
+  const stats = $("#stats");
+
+  if (stats) {
+    const count = (status) =>
+      donations.filter((item) => item.status === status).length;
+
+    const rescuedMeals = donations
+      .filter((item) => item.status === "collected")
+      .reduce((total, item) => total + Number(item.quantity || 0), 0);
+
+    stats.innerHTML = `
+      <div class="card">
+        <h3>${donations.length}</h3>
+        <p>Total Donations</p>
+      </div>
+
+      <div class="card">
+        <h3>${count("available")}</h3>
+        <p>Available</p>
+      </div>
+
+      <div class="card">
+        <h3>${count("accepted")}</h3>
+        <p>Accepted</p>
+      </div>
+
+      <div class="card">
+        <h3>${count("collected")}</h3>
+        <p>Collected</p>
+      </div>
+
+      <div class="card">
+        <h3>${rescuedMeals}</h3>
+        <p>Meals Rescued</p>
+      </div>
+    `;
+  }
+}
+
+// Filter donations
+
+if ($("#filter")) {
+  $("#filter").addEventListener("change", render);
+}
+
+// ---------------- FIREBASE AUTH STATE ----------------
+
 onAuthStateChanged(auth, async (currentUser) => {
   user = currentUser;
 
-  if (unsub) {
-    unsub();
-    unsub = null;
+  if (unsubscribeDonations) {
+    unsubscribeDonations();
+    unsubscribeDonations = null;
   }
 
   if (currentUser) {
     try {
       await loadProfile(currentUser);
 
-      unsub = onSnapshot(
-        query(
-          collection(db, "donations"),
-          orderBy("createdAt", "desc")
-        ),
+      const donationsQuery = query(
+        collection(db, "donations"),
+        orderBy("createdAt", "desc")
+      );
 
+      unsubscribeDonations = onSnapshot(
+        donationsQuery,
         (snapshot) => {
           donations = snapshot.docs.map((item) => ({
             id: item.id,
@@ -288,16 +683,15 @@ onAuthStateChanged(auth, async (currentUser) => {
 
           render();
         },
-
         (error) => {
-          console.error("Donation loading error:", error);
+          console.error("Food loading error:", error);
           toast("Could not load donations: " + error.message, true);
         }
       );
 
     } catch (error) {
       console.error("Profile loading error:", error);
-      toast("Could not load user profile: " + error.message, true);
+      toast("Could not load your profile: " + error.message, true);
     }
 
   } else {
@@ -309,308 +703,4 @@ onAuthStateChanged(auth, async (currentUser) => {
   }
 });
 
-// ADD FOOD DONATION
-async function addDonation(data) {
-  if (!user || profile?.role !== "restaurant") {
-    throw new Error("Only restaurant accounts can donate.");
-  }
-
-  await addDoc(collection(db, "donations"), {
-    ...data,
-    quantity: Number(data.quantity),
-    status: "available",
-    donorId: user.uid,
-    createdAt: serverTimestamp()
-  });
-}
-
-// DONATION FORM
-$("#donate-form").onsubmit = async (event) => {
-  event.preventDefault();
-
-  try {
-    const data = Object.fromEntries(
-      new FormData(event.target)
-    );
-
-    if (new Date(data.expiry).getTime() <= Date.now()) {
-      toast("Please select a future expiry time.", true);
-      return;
-    }
-
-    await addDonation(data);
-
-    toast("Food donation posted successfully!");
-
-    event.target.reset();
-    show("food");
-
-  } catch (error) {
-    toast("Could not post donation: " + error.message, true);
-  }
-};
-
-// SAMPLE DONATIONS
-$("#sample-btn").onclick = async () => {
-  if (!user || profile?.role !== "restaurant") {
-    toast("Only restaurants can add sample donations.", true);
-    return;
-  }
-
-  const futureTime = (hours) => {
-    const date = new Date(Date.now() + hours * 3600000);
-
-    const local = new Date(
-      date.getTime() - date.getTimezoneOffset() * 60000
-    );
-
-    return local.toISOString().slice(0, 16);
-  };
-
-  const base = {
-    donorName: profile.name,
-    contact: profile.email
-  };
-
-  const samples = [
-    {
-      foodName: "Veg Biryani",
-      quantity: 40,
-      description: "Freshly cooked and packed meals",
-      location: "Banjara Hills, Hyderabad",
-      expiry: futureTime(5)
-    },
-    {
-      foodName: "Bread and Buns",
-      quantity: 60,
-      description: "Fresh bakery items",
-      location: "Madhapur, Hyderabad",
-      expiry: futureTime(12)
-    },
-    {
-      foodName: "Dal and Rice",
-      quantity: 25,
-      description: "Freshly prepared food",
-      location: "Secunderabad",
-      expiry: futureTime(3)
-    }
-  ];
-
-  try {
-    for (const sample of samples) {
-      await addDonation({
-        ...base,
-        ...sample
-      });
-    }
-
-    toast("3 sample donations added!");
-
-    show("food");
-
-  } catch (error) {
-    toast(error.message, true);
-  }
-};
-
-// ACCEPT OR COLLECT DONATION
-async function setStatus(id, status) {
-  try {
-    if (!user || !profile) {
-      throw new Error("Please log in first.");
-    }
-
-    if (status === "accepted" && profile.role !== "ngo") {
-      throw new Error("Only NGOs can accept donations.");
-    }
-
-    if (status === "collected" && profile.role !== "volunteer") {
-      throw new Error("Only volunteers can collect food.");
-    }
-
-    const extra = status === "accepted"
-      ? {
-          acceptedBy: user.uid,
-          acceptedByName: profile.name
-        }
-      : {
-          collectedBy: user.uid
-        };
-
-    await updateDoc(
-      doc(db, "donations", id),
-      {
-        status,
-        ...extra
-      }
-    );
-
-    toast(
-      status === "accepted"
-        ? "Donation accepted successfully!"
-        : "Food marked as collected!"
-    );
-
-  } catch (error) {
-    toast("Action failed: " + error.message, true);
-  }
-}
-
-// FOOD LIST BUTTONS
-$("#food-list").onclick = (event) => {
-  const button = event.target.closest("button[data-id]");
-
-  if (button) {
-    setStatus(
-      button.dataset.id,
-      button.dataset.status
-    );
-  }
-};
-
-$("#filter").onchange = render;
-
-// DISPLAY FOOD DONATIONS
-function render() {
-  if (!$("#food-list")) return;
-
-  const filter = $("#filter").value;
-
-  let list = donations.filter((item) => {
-    return filter === "all" || item.status === filter;
-  });
-
-  const foodList = $("#food-list");
-
-  foodList.innerHTML = list.length
-    ? list.map((item) => {
-
-        let button = "";
-
-        if (
-          item.status === "available" &&
-          profile?.role === "ngo"
-        ) {
-          button = `
-            <button class="btn small"
-              data-id="${esc(item.id)}"
-              data-status="accepted">
-              Accept Food ❤️
-            </button>
-          `;
-        }
-
-        if (
-          item.status === "accepted" &&
-          profile?.role === "volunteer"
-        ) {
-          button = `
-            <button class="btn small"
-              data-id="${esc(item.id)}"
-              data-status="collected">
-              Mark Collected 🚚
-            </button>
-          `;
-        }
-
-        return `
-          <article class="card food-card">
-
-            <img
-              class="food-photo"
-              src="${foodPhoto(item.foodName)}"
-              alt="${esc(item.foodName)}"
-              loading="lazy"
-            >
-
-            <div class="food-card-content">
-
-              <span class="badge ${esc(item.status)}">
-                ${esc(item.status)}
-              </span>
-
-              <h3>${esc(item.foodName)}</h3>
-
-              <p>${esc(item.description)}</p>
-
-              <p class="meta">
-                🍱 ${esc(item.quantity)} servings
-              </p>
-
-              <p class="meta">
-                🏨 ${esc(item.donorName)}
-              </p>
-
-              <p class="meta">
-                📍 ${esc(item.location)}
-              </p>
-
-              <p class="meta">
-                📞 ${esc(item.contact)}
-              </p>
-
-              ${
-                item.acceptedByName
-                  ? `<p class="meta">Accepted by ${esc(item.acceptedByName)}</p>`
-                  : ""
-              }
-
-              ${
-                item.status !== "collected"
-                  ? `<p class="count" data-exp="${esc(item.expiry)}">
-                       ${countdown(item.expiry)}
-                     </p>`
-                  : ""
-              }
-
-              ${button}
-
-            </div>
-          </article>
-        `;
-
-      }).join("")
-
-    : `
-      <div class="empty">
-        <h3>🍲 No food donations found</h3>
-        <p>Check back soon for available food.</p>
-      </div>
-    `;
-
-  // DASHBOARD STATISTICS
-  const count = (status) =>
-    donations.filter((item) => item.status === status).length;
-
-  const rescued = donations
-    .filter((item) => item.status === "collected")
-    .reduce((total, item) => total + Number(item.quantity || 0), 0);
-
-  const stat = (value, label) => `
-    <div class="card">
-      <b>${value}</b>
-      ${label}
-    </div>
-  `;
-
-  $("#stats").innerHTML =
-    stat(donations.length, "Total Donations") +
-    stat(count("available"), "Available Food") +
-    stat(count("accepted"), "Accepted Donations") +
-    stat(count("collected"), "Collected Donations") +
-    stat(rescued, "Meals Rescued");
-}
-
-// LIVE EXPIRY COUNTDOWN
-setInterval(() => {
-  document.querySelectorAll("[data-exp]").forEach((element) => {
-    element.textContent = countdown(element.dataset.exp);
-
-    element.classList.toggle(
-      "low",
-      new Date(element.dataset.exp) - Date.now() < 3600000
-    );
-  });
-}, 1000);
-
-render();
+console.log("Food Rescue application loaded successfully.");
